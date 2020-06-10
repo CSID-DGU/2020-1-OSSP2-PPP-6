@@ -66,20 +66,23 @@ public class TetrisBoard extends JPanel implements Runnable, KeyListener, MouseL
 	private TextArea gradeList = new TextArea(10,10);
 	private MessageArea messageArea = new MessageArea(this,2, PANEL_HEIGHT - (MESSAGE_HEIGHT-MESSAGE_X), PANEL_WIDTH-BLOCK_SIZE*7-2, MESSAGE_HEIGHT-2); 
 	private JButton btnStart = new JButton("start");
+	private JButton btnStop = new JButton("stop/continue");
 	private JButton btnExit = new JButton("exit");
 	private JButton dataRemove = new JButton("Data to empty");
 	private JCheckBox checkGhost = new JCheckBox("Ghost md",true);
 	private JCheckBox checkGrid  = new JCheckBox("show grid",true);
 	private Integer[] lv = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20};
-	private String[] lt = {"1stage","2stage","3stage","4stage"};
+	private Integer[] lt = {1,2,3,4};
 	private JComboBox<Integer> comboSpeed = new JComboBox<Integer>(lv);
-	private JComboBox<String> facilityValue = new JComboBox<String>(lt);
+	private JComboBox<Integer> facilityValue = new JComboBox<Integer>(lt);
 	public File fin = new File("F:\\java surces\\Tetris\\grade.txt");
+	public int key = 0;
+	int stopkey = 1;
 	
 	private String ip;
 	private int port;
 	private String nickName;
-	private int grade = 0;
+	public int grade = 0;
 	private Thread th;
 	private ArrayList<Block> blockList;
 	private ArrayList<TetrisBlock> nextBlocks;
@@ -106,14 +109,16 @@ public class TetrisBoard extends JPanel implements Runnable, KeyListener, MouseL
 		this.setLayout(null);
 		this.setFocusable(true);
 		
-		btnStart.setBounds(PANEL_WIDTH - BLOCK_SIZE*7, PANEL_HEIGHT - messageArea.getHeight(), BLOCK_SIZE*7, messageArea.getHeight()/3);
+		btnStart.setBounds(PANEL_WIDTH - BLOCK_SIZE*7, PANEL_HEIGHT - messageArea.getHeight(), BLOCK_SIZE*7, messageArea.getHeight()/4);
 		btnStart.setFocusable(false);
-		btnStart.setEnabled(false);
 		btnStart.addActionListener(this);
-		btnExit.setBounds(PANEL_WIDTH - BLOCK_SIZE*7, PANEL_HEIGHT - messageArea.getHeight()+39, BLOCK_SIZE*7, messageArea.getHeight()/3);
+		btnStop.setBounds(PANEL_WIDTH - BLOCK_SIZE*7, PANEL_HEIGHT - messageArea.getHeight()+30, BLOCK_SIZE*7, messageArea.getHeight()/4);
+		btnStop.setFocusable(false);
+		btnStop.addActionListener(this);
+		btnExit.setBounds(PANEL_WIDTH - BLOCK_SIZE*7, PANEL_HEIGHT - messageArea.getHeight()+60, BLOCK_SIZE*7, messageArea.getHeight()/4);
 		btnExit.setFocusable(false);	
 		btnExit.addActionListener(this);
-		dataRemove.setBounds(PANEL_WIDTH - BLOCK_SIZE*7, PANEL_HEIGHT - messageArea.getHeight()/3, BLOCK_SIZE*7, messageArea.getHeight()/3);
+		dataRemove.setBounds(PANEL_WIDTH - BLOCK_SIZE*7, PANEL_HEIGHT - messageArea.getHeight()+90, BLOCK_SIZE*7, messageArea.getHeight()/4);
 		dataRemove.setFocusable(false);
 		dataRemove.addActionListener(this);
 		
@@ -151,6 +156,7 @@ public class TetrisBoard extends JPanel implements Runnable, KeyListener, MouseL
 		this.add(messageArea);
 		this.add(gradeList);
 		this.add(btnStart);	
+		this.add(btnStop);
 		this.add(dataRemove);
 		this.add(btnExit);
 		this.add(checkGhost);
@@ -167,7 +173,7 @@ public class TetrisBoard extends JPanel implements Runnable, KeyListener, MouseL
 			}
 			gradeSort(gradeArr);
 			for(int k = 0;k<no;k++) {		
-				str = String.valueOf(gradeArr[k]);				
+				str = String.valueOf(gradeArr[k]);	
 				gradeList.append("No."+(k+1)+" : ");
 			    gradeList.append(str+" 점");	
 			    gradeList.append("\n");	
@@ -200,8 +206,9 @@ public class TetrisBoard extends JPanel implements Runnable, KeyListener, MouseL
 	 * 게임을 시작한다.
 	 */
 	
-	public void gameStart(int speed){
+	public void gameStart(int speed, int stage){
 		comboSpeed.setSelectedItem(new Integer(speed));
+		facilityValue.setSelectedItem(new Integer(stage)); 
 		//돌고 있을 스레드를 정지시킨다.
 		if(th!=null){
 			try {isPlay = false;th.join();} 
@@ -209,7 +216,7 @@ public class TetrisBoard extends JPanel implements Runnable, KeyListener, MouseL
 		}
 		
 		//맵셋팅
-		map = new Block[maxY][maxX];
+		map = new Block[maxY][maxX]; 
 		blockList = new ArrayList<Block>();
 		nextBlocks = new ArrayList<TetrisBlock>();
 		
@@ -221,7 +228,7 @@ public class TetrisBoard extends JPanel implements Runnable, KeyListener, MouseL
 		controller = new TetrisController(shap,maxX-1,maxY-1,map);
 		controllerGhost = new TetrisController(ghost,maxX-1,maxY-1,map);
 		this.showGhost();
-		for(int i=0 ; i<5 ; i++){
+		for(int i=0 ; i<stage+1 ; i++){
 			nextBlocks.add(getRandomTetrisBlock());
 		}
 		
@@ -776,40 +783,45 @@ public class TetrisBoard extends JPanel implements Runnable, KeyListener, MouseL
 	public void actionPerformed(ActionEvent e) {
 		if(e.getSource() == btnStart){
 			if(client!=null){
+				key++;
 				grade = 0;
-				client.gameStart((int)comboSpeed.getSelectedItem());
+				if(key>1) {
+					messageArea.printMessage("The game starts again. The last score is 0.");
+				}
+				client.gameStart((int)comboSpeed.getSelectedItem(),(int)facilityValue.getSelectedItem());
 			}else{
-				this.gameStart((int)comboSpeed.getSelectedItem());
+				this.gameStart((int)comboSpeed.getSelectedItem(),(int)facilityValue.getSelectedItem());
 			}
 		}else if(e.getSource() == btnExit){
 			try {
-			if(client!=null ){
+			BufferedWriter fw = new BufferedWriter(new FileWriter(fin,true));
+			PrintWriter pw = new PrintWriter(fw);
+			String line;
+			if(grade!=0) {
+			  if(grade>gradeArr[gradeArr.length-1] && no==10) {
+				 FileOutputStream remove = new FileOutputStream("F:\\java surces\\Tetris\\grade.txt");
+				 remove.write(new String("").getBytes());
+				 gradeArr[no-1] = grade;
+				 for(int i=0;i<no;i++) {
+					pw.println(gradeArr[i]);
+				 }
+		  }else { pw.println(grade);}
+			}
+			messageArea.printMessage("The grade of this game is "+grade+" point");
+			fw.flush();
+            fw.close();
+            pw.close();
+			}catch(IOException e1) {
+			     System.out.println("can't find file");
+			}
+			if(client!=null){
 				if(tetris.isNetwork()){
-					BufferedWriter fw = new BufferedWriter(new FileWriter(fin,true));
-					PrintWriter pw = new PrintWriter(fw);
-					String line;
-					if(grade!=0) {
-					  if(grade>gradeArr[gradeArr.length-1] && no==10) {
-						 FileOutputStream remove = new FileOutputStream("F:\\java surces\\Tetris\\grade.txt");
-						 remove.write(new String("").getBytes());
-						 gradeArr[no-1] = grade;
-						 for(int i=0;i<no;i++) {
-							pw.println(gradeArr[i]);
-						 }
-				  }else { pw.println(grade);}
-					}
-					fw.flush();
-		            fw.close();
-		            pw.close();
 					client.closeNetwork(tetris.isServer());
 				}
 			}else{
 				System.exit(0);
 			}
-		}catch(IOException e1) {
-		     System.out.println("can't find file");
-		}
-	}else if(e.getSource() == dataRemove){
+		}else if(e.getSource() == dataRemove){
 		try {
 			FileOutputStream remove = new FileOutputStream("F:\\java surces\\Tetris\\grade.txt");
 		    remove.write(new String("").getBytes());
@@ -817,7 +829,6 @@ public class TetrisBoard extends JPanel implements Runnable, KeyListener, MouseL
 		} catch (IOException e1) {
 			e1.printStackTrace();
 		}
-		
 	}
 	}
 
@@ -829,7 +840,7 @@ public class TetrisBoard extends JPanel implements Runnable, KeyListener, MouseL
 	public void printSystemMessage(String msg){systemMsg.printMessage(msg);}
 	public void printMessage(String msg){messageArea.printMessage(msg);}
 	public GameClient getClient(){return client;}
-	public void changeSpeed(Integer speed) {comboSpeed.setSelectedItem(speed);}
+	public void changeSpeed(Integer speed, Integer stage) {comboSpeed.setSelectedItem(speed);facilityValue.setSelectedItem(stage);}
 	public void clearMessage() {
 		messageArea.clearMessage();
 		systemMsg.clearMessage();
