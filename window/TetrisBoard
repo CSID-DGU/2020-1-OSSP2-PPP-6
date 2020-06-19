@@ -5,12 +5,17 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.TextArea;
+import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -27,10 +32,15 @@ import java.util.ArrayList;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
+import javax.swing.JFrame;
+import javax.swing.JMenu;
+import javax.swing.JMenuBar;
+import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JTextArea;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
+import javax.swing.JFrame;
 
 import com.tetris.classes.Block;
 import com.tetris.classes.TetrisBlock;
@@ -45,6 +55,7 @@ import com.tetris.shape.RightTwoUp;
 import com.tetris.shape.RightUp;
 
 public class TetrisBoard extends JPanel implements Runnable, KeyListener, MouseListener, ActionListener{
+	JFrame j = new JFrame();
 	private static final long serialVersionUID = 1L;
 	
 	private Tetris tetris;
@@ -99,8 +110,10 @@ public class TetrisBoard extends JPanel implements Runnable, KeyListener, MouseL
 	private boolean usingGrid = true;
 	private int removeLineCount = 0;
 	private int removeLineCombo = 0;
+	public JMenuItem itemServerStart = new JMenuItem("Connect to server");
+	public JMenuItem itemClientStart = new JMenuItem("Connect to client");
 	
-	public TetrisBoard(Tetris tetris, GameClient client){
+	public TetrisBoard(Tetris tetris, GameClient client){		
 		this.tetris = tetris;
 		this.client = client;
 		this.setPreferredSize(new Dimension(PANEL_WIDTH,PANEL_HEIGHT));//기본크기
@@ -116,7 +129,7 @@ public class TetrisBoard extends JPanel implements Runnable, KeyListener, MouseL
 		btnStop.setFocusable(false);
 		btnStop.addActionListener(this);
 		btnExit.setBounds(PANEL_WIDTH - BLOCK_SIZE*7, PANEL_HEIGHT - messageArea.getHeight()+60, BLOCK_SIZE*7, messageArea.getHeight()/4);
-		btnExit.setFocusable(false);	
+		btnExit.setFocusable(false);
 		btnExit.addActionListener(this);
 		dataRemove.setBounds(PANEL_WIDTH - BLOCK_SIZE*7, PANEL_HEIGHT - messageArea.getHeight()+90, BLOCK_SIZE*7, messageArea.getHeight()/4);
 		dataRemove.setFocusable(false);
@@ -181,6 +194,53 @@ public class TetrisBoard extends JPanel implements Runnable, KeyListener, MouseL
 		}catch(IOException e) {
 			System.out.println("can't find file");
 		}
+	}
+	
+	public void jf() {
+		JMenuBar mnBar = new JMenuBar();
+		JMenu mnGame = new JMenu("play");
+		
+		mnGame.add(itemServerStart);
+		mnGame.add(itemClientStart);
+		mnBar.add(mnGame);
+		
+		j.setJMenuBar(mnBar);
+		j.setTitle("Tetris Game");
+		j.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
+		j.getContentPane().add(this);
+	
+		j.setResizable(true);
+		j.pack();
+		Dimension size = Toolkit.getDefaultToolkit().getScreenSize();
+		j.setLocation((size.width-this.getWidth())/2,(size.height-this.getHeight())/2);
+		j.setVisible(true);
+		j.addComponentListener(new ComponentAdapter() {
+			public void componentResized(ComponentEvent e) {
+            	int fraWidth = j.getWidth();
+        		int fraHeight = j.getHeight();
+        		btnStart.setBounds((fraWidth) - (fraWidth-messageArea.getWidth()), ((fraHeight-62) - messageArea.getHeight()), fraWidth-messageArea.getWidth(),messageArea.getHeight()/4);
+        		btnStop.setBounds((fraWidth) - (fraWidth-messageArea.getWidth()), (fraHeight-62) - messageArea.getHeight()+(messageArea.getHeight()/4)*1, fraWidth-messageArea.getWidth(), messageArea.getHeight()/4);
+        		btnExit.setBounds((fraWidth) - (fraWidth-messageArea.getWidth()), (fraHeight-62) - messageArea.getHeight()+(messageArea.getHeight()/4)*2, fraWidth-messageArea.getWidth(), messageArea.getHeight()/4);
+        		dataRemove.setBounds((fraWidth) - (fraWidth-messageArea.getWidth()), (fraHeight-62) - messageArea.getHeight()+(messageArea.getHeight()/4)*3, fraWidth-messageArea.getWidth(),messageArea.getHeight()/4);
+        		messageArea.setBounds(2, PANEL_HEIGHT - (MESSAGE_HEIGHT-MESSAGE_X), PANEL_WIDTH-BLOCK_SIZE*7-2+(fraWidth-PANEL_WIDTH)/2, MESSAGE_HEIGHT-2+(fraHeight-(PANEL_HEIGHT+62)));
+            }
+		});
+		j.addWindowListener(new WindowAdapter() {
+
+			@Override
+			public void windowClosing(WindowEvent e) {
+				if(client!=null ){
+					
+					if(tetris.isNetwork){
+						client.closeNetwork(tetris.isServer);
+					}
+				}else{
+					System.exit(0);
+				}
+				
+			}
+			
+		});
 	}
 	
 	public static void gradeSort(int []a) {
@@ -792,7 +852,29 @@ public class TetrisBoard extends JPanel implements Runnable, KeyListener, MouseL
 			}else{
 				this.gameStart((int)comboSpeed.getSelectedItem(),(int)facilityValue.getSelectedItem());
 			}
-		}else if(e.getSource() == btnExit){
+		}else if(e.getSource() == btnStop) {
+			if(client==null) {
+			stopkey = -stopkey;
+			try {
+			if(stopkey==-1) {
+				messageArea.printMessage("The game has been temporarily suspended.");
+				isPlay = false;
+			    th.join();
+				}
+			else if(stopkey==1) {
+				messageArea.printMessage("The game continues.");
+				isPlay = true;
+				th = new Thread(this);
+				th.start();
+			}
+			}catch (InterruptedException e1) {
+				e1.printStackTrace();
+			
+			}
+		  }
+			else return;
+		}
+		else if(e.getSource() == btnExit){
 			try {
 			BufferedWriter fw = new BufferedWriter(new FileWriter(fin,true));
 			PrintWriter pw = new PrintWriter(fw);
