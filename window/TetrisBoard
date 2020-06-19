@@ -857,10 +857,12 @@ public class TetrisBoard extends JPanel implements Runnable, KeyListener, MouseL
 			stopkey = -stopkey;
 			try {
 			if(stopkey==-1) {
+				messageArea.printMessage("The game has been temporarily suspended.");
 				isPlay = false;
 			    th.join();
 				}
 			else if(stopkey==1) {
+				messageArea.printMessage("The game continues.");
 				isPlay = true;
 				th = new Thread(this);
 				th.start();
@@ -889,8 +891,8 @@ public class TetrisBoard extends JPanel implements Runnable, KeyListener, MouseL
 			}
 			messageArea.printMessage("The grade of this game is "+grade+" point");
 			fw.flush();
-            fw.close();
-            pw.close();
+            		fw.close();
+            		pw.close();
 			}catch(IOException e1) {
 			     System.out.println("can't find file");
 			}
